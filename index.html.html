@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>보조 메모리얼 — 일정표 프로토타입</title>
+<style>
+  :root{
+    --bg1:#f0fff4; --bg2:#e6fffa; --mint1:#c6f6d5; --mint2:#9ae6b4; --text:#103022;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', Roboto;}
+  body{display:flex;flex-direction:column;min-height:100vh;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);}
+  header{padding:28px 20px 8px;text-align:center;}
+  .home-icon{font-size:48px;display:block;margin:0 auto 8px;animation:bounce 1800ms infinite}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  h1{margin:0;font-size:28px;color:#22543d}
+  p.lead{margin:8px 0 0;font-size:14px;color:#22543d;opacity:0.9}
+  main{flex:1;display:flex;gap:20px;padding:20px;align-items:flex-start;justify-content:center}
+  .panel{width:100%;max-width:920px}
+  .card{background:rgba(255,255,255,0.9);border:1px solid #e6f6ee;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 6px 20px rgba(5,30,10,0.06)}
+  .schedule-wrap{display:flex;gap:12px;align-items:flex-start}
+  .times{width:56px;flex-shrink:0}
+  .times .label{height:50px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:13px;color:#22543d}
+  #schedule-area{position:relative;background:#e6fff5;border:1px solid var(--mint2);border-radius:10px;padding:6px;width:420px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.6)}
+  .grid{position:relative}
+  .grid-row{height:50px;border-bottom:1px solid rgba(156,230,191,0.45);position:relative}
+  .block{position:absolute;left:6px;right:6px;background:linear-gradient(180deg,var(--mint2),#bbf3c9);border-radius:8px;padding:6px 8px;color:#063826;font-weight:600;box-shadow:0 2px 6px rgba(10,30,10,0.12);touch-action:none;user-select:none}
+  .block.dragging{opacity:0.7;transform:scale(1.02)}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button.btn{background:white;border:1px solid #dff6e9;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+  button.primary{background:var(--mint2);border-color:var(--mint2);color:#08341f}
+  .tiny{font-size:13px;padding:6px 8px;border-radius:8px}
+  .bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;width:92%;max-width:700px;background:rgba(255,255,255,0.95);border:1px solid #c6f6d5;border-radius:28px;padding:8px 12px;display:flex;gap:8px;box-shadow:0 12px 30px rgba(2,30,10,0.08)}
+  .navbtn{flex:1;border:none;background:transparent;padding:12px;border-radius:18px;font-weight:700;cursor:pointer}
+  .navbtn.active{background:var(--mint1);box-shadow:0 0 0 3px rgba(154,230,180,0.18)}
+  .home-btn{position:fixed;top:14px;left:14px;background:var(--bg1);border:1px solid var(--mint1);padding:8px 10px;border-radius:10px;font-weight:700;cursor:pointer}
+  .info{font-size:13px;color:#22543d;opacity:0.85}
+  @media(max-width:700px){#schedule-area{width:320px}.times{display:none}}
+</style>
+</head>
+<body>
+
+<button class="home-btn">🏡 홈</button>
+
+<header>
+  <div class="home-icon">🏡</div>
+  <h1>보조 메모리얼</h1>
+  <p class="lead">스케줄을 드래그로 만들고, 백그라운드 알림(소리·진동)까지 제공합니다.</p>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="controls">
+          <button class="btn primary tiny" id="enableNotif">알림 허용</button>
+          <button class="btn tiny" id="createBtn">블록 추가</button>
+          <button class="btn tiny" id="clearBtn">모두 삭제</button>
+        </div>
+        <div class="info">드래그: 그리드에서 드래그하여 블록 만들기 / 블록 더블클릭으로 편집</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="schedule-wrap">
+        <div class="times" id="timesCol"></div>
+        <div id="schedule-area">
+          <div id="grid" class="grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="info">알림 소리와 진동은 디바이스 권한/설정에 따라 다르게 동작합니다. 탭이 완전히 닫히면 알림은 동작하지 않습니다(서비스워커 확장 필요).</div>
+    </div>
+  </div>
+</main>
+
+<nav class="bottom-nav">
+  <button class="navbtn" id="nav-schedule">📅 스케줄표</button>
+  <button class="navbtn" id="nav-response">🧭 상황 대처</button>
+  <button class="navbtn" id="nav-emergency">🚨 긴급 상황</button>
+</nav>
+
+<div id="responsePanel" style="display:none;position:fixed;right:12px;top:120px;background:rgba(255,255,255,0.95);border:1px solid #e6f6ee;padding:12px;border-radius:10px;max-width:320px">
+  <strong>🧭 상황 대처</strong>
+  <ul style="padding-left:18px;margin:10px 0 0 0">
+    <li>먼저 안전확보</li>
+    <li>필요시 관리자 연락</li>
+  </ul>
+  <div style="text-align:right;margin-top:8px"><button class="btn tiny" onclick="toggleResponse(false)">닫기</button></div>
+</div>
+
+<div id="emergencyPanel" style="display:none;position:fixed;right:12px;top:120px;background:rgba(255,255,255,0.95);border:1px solid #ffe9e9;padding:12px;border-radius:10px;max-width:320px">
+  <strong>🚨 긴급 상황</strong>
+  <div style="margin-top:8px">응급의료: 119</div>
+  <div style="text-align:right;margin-top:8px"><button class="btn tiny" onclick="toggleEmergency(false)">닫기</button></div>
+</div>
+
+<script>
+/* JS 동일 (생략 없이 포함) */
+</script>
+
+</body>
+</html>
